@@ -182,7 +182,9 @@ class DDQNAgent(DQNAgent):
 
 def share_grad(net, shared_net):
     for param, shared_param in zip(net.parameters(),shared_net.parameters()):
-        shared_param._grad = param.grad #now they are the same object?
+        if param.grad == None:
+            param.grad = torch.zeros_like(param) # initialization
+        shared_param._grad = param.grad # reference
 
 
 def eval(target_agent,T, I_eval, T_max):
@@ -211,7 +213,7 @@ def eval(target_agent,T, I_eval, T_max):
 
 
 
-def thread_train(id, agent, target_agent, T, n_update, I_target,num_steps, T_max, lr, epsilon_decay,gamma):
+def process_train(id, agent, target_agent, T, n_update, I_target,num_steps, T_max, lr, epsilon_decay,gamma):
     torch.set_default_tensor_type(next(agent.parameters()).type())
     device = next(agent.parameters()).device
     env = make_env(seed=id)
@@ -220,25 +222,25 @@ def thread_train(id, agent, target_agent, T, n_update, I_target,num_steps, T_max
     state_shape = env.observation_space.shape
 
     np.random.seed(id)
-    thread_agent = DDQNAgent(state_shape, n_actions, epsilon=np.random.uniform(0.7,1)).to(device)
+    process_agent = DDQNAgent(state_shape, n_actions, epsilon=np.random.uniform(0.7,1)).to(device)
     epsilon_min = 10**np.random.uniform(-0.5,-2.2)
-    share_grad(thread_agent, agent)
+    share_grad(process_agent, agent)
     opt = torch.optim.Adam(agent.parameters(), lr)
     scheduler = torch.optim.lr_scheduler.MultiStepLR(opt, milestones=[200000,500000,1000000], gamma=0.3) # lr scheduler
 
     while T.value<T_max:
-        thread_agent.load_state_dict(agent.state_dict())
+        process_agent.load_state_dict(agent.state_dict())
         rewards = []
         states = []
         actions = []
         for _ in range(num_steps):
             states.append(s)
-            qvalues = thread_agent.get_qvalues([s])
-            a = thread_agent.sample_actions(qvalues)[0]
+            qvalues = process_agent.get_qvalues([s])
+            a = process_agent.sample_actions(qvalues)[0]
             s, r, done, _ = env.step(a)
             actions.append(a)
             rewards.append(r)
-            thread_agent.epsilon = max(epsilon_min, thread_agent.epsilon-epsilon_decay)
+            process_agent.epsilon = max(epsilon_min, process_agent.epsilon-epsilon_decay)
             if done:
                 env.reset()
                 break
@@ -250,18 +252,18 @@ def thread_train(id, agent, target_agent, T, n_update, I_target,num_steps, T_max
         if done:
             R.append(0)
         else:
-            a_max = np.argmax(thread_agent.get_qvalues([s]))
+            a_max = np.argmax(process_agent.get_qvalues([s]))
             R.append(target_agent.get_qvalues([s])[0,a_max])
 
         states = torch.tensor(states)
-        Q = agent(states)[range(len(actions)), actions]
+        Q = process_agent(states)[range(len(actions)), actions]
         for _ in range(len(rewards)):
             r = rewards.pop()
             R.append(r + gamma*R[-1])
         R = torch.tensor(R[-1:0:-1])
         loss = torch.mean((R-Q)**2)
         loss.backward()
-        nn.utils.clip_grad_norm_(thread_agent.parameters(), 20)
+        nn.utils.clip_grad_norm_(process_agent.parameters(), 20)
         opt.step()
         opt.zero_grad()
         scheduler.step()
@@ -310,7 +312,7 @@ if __name__ == '__main__':
     processes.append(p)
 
     for id in range(1, num_processes):
-        p = mp.Process(target=thread_train, args=(id, agent, target_agent, T, n_update, I_target,num_steps, T_max, lr, epsilon_decay,gamma))
+        p = mp.Process(target=process_train, args=(id, agent, target_agent, T, n_update, I_target,num_steps, T_max, lr, epsilon_decay,gamma))
         p.start()
         processes.append(p)
     for p in processes:
