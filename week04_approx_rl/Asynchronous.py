@@ -242,7 +242,7 @@ def process_train(id, agent, target_agent, T, n_update, I_target,num_steps, T_ma
             rewards.append(r)
             process_agent.epsilon = max(epsilon_min, process_agent.epsilon-epsilon_decay)
             if done:
-                env.reset()
+                s = env.reset()
                 break
 
         with T.get_lock():
