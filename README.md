@@ -23,18 +23,6 @@ __Note:__ this branch is an on-campus version of the for __spring 2019 YSDA and 
 # Additional materials
 * [RL reading group](https://github.com/yandexdataschool/Practical_RL/wiki/RL-reading-group)
 
-
-# Syllabus
-
-The syllabus is approximate: the lectures may occur in a slightly different order and some topics may end up taking two weeks.
-
-* __week01_intro__ Introduction
-  * Lecture: RL problems around us. Decision processes. Stochastic optimization, Crossentropy method. Parameter space search vs action space search.
-  * Seminar: Welcome into openai gym. Tabular CEM for Taxi-v0, deep CEM for box2d environments.
-  * Homework description - see week1/README.md. 
-  * **HSE Deadline: TBA**
-  * **YSDA Deadline: TBA**
-
 # Course staff
 Course materials and teaching by: _[unordered]_
 - [Pavel Shvechikov](https://github.com/bestxolodec) - lectures, seminars, hw checkups, reading group
